@@ -31,7 +31,7 @@ app/
 │   ├── usecases/      # CatalogSearch（二阶段召回+到手价内联）、PlaceOrder/QueryOrder/CancelOrder
 │   ├── tools/         # product_search、订单三工具、web_search、remember_preference、task_dispatch
 │   ├── agents/        # MainAgent / SearchAgent / TradeAgent 工厂 + Orchestrator + SessionRegistry
-│   └── prompts/       # globex.yml：主 / 子 Agent 系统提示词
+│   └── prompts/       # maidui.yml：主 / 子 Agent 系统提示词
 ├── infrastructure/    # llm/embedding/qdrant/reranker/tracing、rag 知识库、缓存、队列、韧性与闸门、仓储
 ├── presentation/      # FastAPI 路由、WebSocket ConnectionManager、DTO
 ├── composition.py     # 装配容器（API 与 worker 共用一份接线）

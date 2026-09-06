@@ -21,7 +21,7 @@ class ShoppingContextSnapshot:
 
 
 _current_snapshot: ContextVar[Optional[ShoppingContextSnapshot]] = ContextVar(
-    "globex_shopping_context",
+    "maidui_shopping_context",
     default=None,
 )
 

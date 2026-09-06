@@ -1,5 +1,5 @@
 [project]
-name = "globex-agent"
+name = "maidui-agent"
 version = "0.1.0"
 description = "买对| 电商购物助手Agent（AgentScope 2.0）"
 readme = "README.md"

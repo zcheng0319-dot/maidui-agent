@@ -20,8 +20,8 @@ interface Turn {
 }
 
 export default function App() {
-  const [sessionId] = useState(() => loadOrCreate("globex.session", "web"));
-  const [buyerId] = useState(() => loadOrCreate("globex.buyer", "buyer"));
+  const [sessionId] = useState(() => loadOrCreate("maidui.session", "web"));
+  const [buyerId] = useState(() => loadOrCreate("maidui.buyer", "buyer"));
   const [events, setEvents] = useState<TradeEvent[]>([]);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [streaming, setStreaming] = useState("");

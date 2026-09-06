@@ -88,7 +88,7 @@ def build_query_order_tool(usecase: QueryOrderUseCase, bus: TradeEventBus):
 
         Args:
             order_id (`str`):
-                订单号，如 "GBX-000001"。
+                订单号，如 "MDUI-000001"。
         """
         session_id = ShoppingContext.current_session_id()
         bus.publish(session_id, "tool.invoke", {"tool": "query_order_tool", "args": {"order_id": order_id}})
@@ -109,7 +109,7 @@ def build_cancel_order_tool(usecase: CancelOrderUseCase, bus: TradeEventBus):
 
         Args:
             order_id (`str`):
-                订单号，如 "GBX-000001"。
+                订单号，如 "MDUI-000001"。
             reason (`str`):
                 取消原因，必填。
         """
