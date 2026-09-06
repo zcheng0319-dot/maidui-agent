@@ -21,15 +21,15 @@ from app.infrastructure.eventbus import TradeEvent
 
 logger = logging.getLogger(__name__)
 
-_STREAM = "globex:intents"
+_STREAM = "maidui:intents"
 # 大请求（长会话）单独一条流：与正常流同一消费者组名，
 # 但 xreadgroup 里正常流排在前面——Redis 按传入顺序返回，天然形成优先级。
-_LARGE_STREAM = "globex:intents:large"
-_DEAD_STREAM = "globex:intents:dead"
-_GROUP = "globex-workers"
-_STATUS_PREFIX = "globex:task:"
+_LARGE_STREAM = "maidui:intents:large"
+_DEAD_STREAM = "maidui:intents:dead"
+_GROUP = "maidui-workers"
+_STATUS_PREFIX = "maidui:task:"
 _STATUS_TTL = 3600
-_EVENT_CHANNEL_PREFIX = "globex:events:"
+_EVENT_CHANNEL_PREFIX = "maidui:events:"
 
 
 class RedisStreamTaskQueue(TaskQueue):

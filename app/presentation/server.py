@@ -210,7 +210,7 @@ async def _queue_priority(c: Container, session_id: str) -> int:
     """
     if not c.settings.queue_priority_enabled or not c.cache.enabled:
         return 0
-    key = f"globex:turns:{session_id}"
+    key = f"maidui:turns:{session_id}"
     try:
         current = int(await c.cache.get_raw(key) or 0) + 1
         await c.cache.set_json(key, current, _TURN_COUNTER_TTL_SECONDS)

@@ -62,7 +62,7 @@ class Settings:
     llm_min_interval_seconds: float = 1.0  # 相邻请求起跑最小间隔，治速率爬升过快
     llm_max_retries: int = 2  # 瞬时故障重试次数（指数退避）
     # ---- 四期：存储 ----
-    # 默认 SQLite（零外部依赖，落在 DATA_DIR/globex.db）。
+    # 默认 SQLite（零外部依赖，落在 DATA_DIR/maidui.db）。
     # 换服务型数据库需自行装异步驱动（aiomysql / asyncpg）并改此 URL，本仓未验证。
     # 特殊值 "file" = 退回三期的 JSON 文件存储（无数据库）
     database_url: str = ""
@@ -114,13 +114,13 @@ def load_settings() -> Settings:
         embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-v4"),
         embedding_dim=int(os.getenv("EMBEDDING_DIM", "1024")),
         qdrant_url=os.getenv("QDRANT_URL", ""),
-        qdrant_collection=os.getenv("QDRANT_COLLECTION", "globex_products"),
+        qdrant_collection=os.getenv("QDRANT_COLLECTION", "maidui_products"),
         reranker_base_url=os.getenv("RERANKER_BASE_URL", ""),
         reranker_model=os.getenv("RERANKER_MODEL", ""),
         tavily_api_key=os.getenv("TAVILY_API_KEY", ""),
         otlp_endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
         data_dir=data_dir,
-        category_kb_collection=os.getenv("CATEGORY_KB_COLLECTION", "globex_category_kb"),
+        category_kb_collection=os.getenv("CATEGORY_KB_COLLECTION", "maidui_category_kb"),
         context_size=int(os.getenv("CONTEXT_SIZE", "128000")),
         tool_result_limit=int(os.getenv("TOOL_RESULT_LIMIT", "20000")),
         reply_token_budget=int(os.getenv("REPLY_TOKEN_BUDGET", "0")),
@@ -142,7 +142,7 @@ def load_settings() -> Settings:
         database_url=(
             os.getenv("DATABASE_URL")
             or os.getenv("MYSQL_URL")
-            or f"sqlite+aiosqlite:///{data_dir / 'globex.db'}"
+            or f"sqlite+aiosqlite:///{data_dir / 'maidui.db'}"
         ),
         redis_url=os.getenv("REDIS_URL", ""),
         semantic_cache_enabled=os.getenv("SEMANTIC_CACHE_ENABLED", "1") not in ("0", "false", "False"),

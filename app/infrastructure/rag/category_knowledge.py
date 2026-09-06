@@ -4,8 +4,8 @@
 品类洞察 RAG 知识库：复用 AgentScope 2.0 的 KnowledgeBase + QdrantStore + OpenAIEmbeddingModel。
 
 与商品向量索引分开两套 collection：
-    globex_products     商品卡向量（模块一：二阶段召回）
-    globex_category_kb  品类洞察知识（本模块：RAG 问答）
+    maidui_products     商品卡向量（模块一：二阶段召回）
+    maidui_category_kb  品类洞察知识（本模块：RAG 问答）
 
 建库流程：TextParser 读 knowledge/*.md → ApproxTokenChunker 切块 → insert_document（按文件名做 document_id，幂等）。
 """
