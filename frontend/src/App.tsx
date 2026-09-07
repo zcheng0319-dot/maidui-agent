@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ConversationPanel, { type ConversationTurn } from "./components/ConversationPanel";
 import ResearchPanel, { type ResearchTab } from "./components/ResearchPanel";
 import HomeView from "./components/HomeView";
@@ -27,7 +27,7 @@ function loadOrCreate(key: string, prefix: string): string {
 export default function App() {
   if (isMockRoute()) return <MaiduiMock />;
 
-  const [sessionId, setSessionId] = useState(() => loadOrCreate("maidui.session", "web"));
+  const [sessionId] = useState(() => loadOrCreate("maidui.session", "web"));
   const [buyerId] = useState(() => loadOrCreate("maidui.buyer", "buyer"));
   const [events, setEvents] = useState<TradeEvent[]>([]);
   const [turns, setTurns] = useState<ConversationTurn[]>([]);
@@ -42,44 +42,6 @@ export default function App() {
   const wsRef = useRef<WebSocket | null>(null);
   // This ref preserves the existing event stream and supplies a UI-only turn boundary.
   const eventsRef = useRef<TradeEvent[]>([]);
-
-  /** 生成新的 session ID */
-  const generateNewSessionId = useCallback(() => {
-    const newId = `web-${Math.random().toString(36).slice(2, 8)}`;
-    localStorage.setItem("maidui.session", newId);
-    return newId;
-  }, []);
-
-  /** 清理当前会话状态（保留 buyerId） */
-  const clearCurrentSession = useCallback(() => {
-    setEvents([]);
-    setTurns([]);
-    setStreaming("");
-    setInput("");
-    setBusy(false);
-    setResearchTab("candidates");
-    eventsRef.current = [];
-  }, []);
-
-  /** 处理"新对话"：创建新 session + 清理状态 + 回到 Home */
-  const handleNewChat = useCallback(() => {
-    // 1. 创建新的 session ID
-    const newSessionId = generateNewSessionId();
-    setSessionId(newSessionId);
-    
-    // 2. 清理当前会话状态
-    clearCurrentSession();
-    
-    // 3. 关闭旧 WebSocket（useEffect 会自动用新 sessionId 重连）
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-    
-    // 4. 回到 Home 视图
-    setHomeKey((key) => key + 1);
-    setView("home");
-  }, [generateNewSessionId, clearCurrentSession]);
 
   useEffect(() => {
     let closed = false;
@@ -162,6 +124,11 @@ export default function App() {
     if (!query.trim()) return;
     setView("session");
     await submit(query);
+  };
+
+  const handleNewChat = () => {
+    setHomeKey((key) => key + 1);
+    setView("home");
   };
 
   const latestBuyerQuery = (() => {

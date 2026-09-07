@@ -25,6 +25,15 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
+# 加载 .env 文件（如果存在）
+try:
+    from dotenv import load_dotenv
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if env_path.exists():
+        load_dotenv(env_path)
+except ImportError:
+    pass  # python-dotenv 未安装，跳过
+
 import httpx
 import yaml
 
@@ -235,7 +244,7 @@ async def main() -> None:
 
     results = []
     ground_truth = build_ground_truth()
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         for case in cases:  # 顺序执行：memory-recall 依赖 memory-write
             print(f"== 评测 {case['id']} ...", flush=True)
             try:

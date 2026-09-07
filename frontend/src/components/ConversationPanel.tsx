@@ -59,6 +59,7 @@ export default function ConversationPanel({
             const actions = [
               ...(turnCards.length > 0 ? [{ label: "查看候选商品", onClick: () => onOpenTab("candidates") }] : []),
               ...(turnCards.length >= 2 ? [{ label: "查看完整对比", onClick: () => onOpenTab("comparison") }] : []),
+              ...(turn.finalEventIndex !== undefined ? [{ label: "查看详细分析", onClick: () => onOpenTab("recommendation") }] : []),
             ];
             return <AgentMessage key={index} text={turn.text} events={turnEvents} actions={actions} />;
           })}
