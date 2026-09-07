@@ -179,3 +179,37 @@ export function currentThinkingText(events: TradeEvent[]): string | null {
   const active = steps.find((s) => s.state === "running");
   return active ? activeMapping[active.key] : null;
 }
+
+/**
+ * Return the real event slice owned by one completed agent response.
+ * `final.result` is the existing stream boundary: events after the previous
+ * final result through this one belong to the same response.  This is a UI
+ * grouping helper only; it neither changes nor supplements event data.
+ */
+export function getEventsForAgentTurn(
+  events: TradeEvent[],
+  finalEventIndex: number,
+): TradeEvent[] {
+  if (finalEventIndex < 0 || finalEventIndex >= events.length) return [];
+
+  let start = 0;
+  for (let index = finalEventIndex - 1; index >= 0; index -= 1) {
+    if (events[index].type === "final.result") {
+      start = index + 1;
+      break;
+    }
+  }
+  return events.slice(start, finalEventIndex + 1);
+}
+
+/** Events since the most recent completed response, for the live stream. */
+export function getEventsForActiveAgentTurn(events: TradeEvent[]): TradeEvent[] {
+  let start = 0;
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    if (events[index].type === "final.result") {
+      start = index + 1;
+      break;
+    }
+  }
+  return events.slice(start);
+}
