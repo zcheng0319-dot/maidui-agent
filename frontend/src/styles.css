@@ -2669,6 +2669,122 @@ main {
 .work-trace-step.is-error .work-trace-step-icon { border-color: #bc5b50; }
 .work-trace-step small { color: var(--accent); font-size: 11px; }
 
+/* 新增：步骤头部可点击区域 */
+.work-trace-step-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 18px;
+  padding: 2px 0;
+  border-radius: 4px;
+  transition: background-color 150ms ease;
+}
+.work-trace-step-header:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+.work-trace-step-label {
+  flex: 1;
+}
+.work-trace-step-status {
+  color: var(--accent);
+  font-size: 11px;
+  margin-left: auto;
+}
+.work-trace-step-expand-indicator {
+  font-size: 10px;
+  color: var(--ink-muted);
+  margin-left: 4px;
+}
+
+/* 新增：展开的事件详情容器 */
+.work-trace-step-events {
+  margin-top: 8px;
+  margin-left: 19px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 6px;
+  border-left: 2px solid var(--accent);
+  animation: trace-expand 150ms ease-out both;
+}
+
+/* 新增：单个事件项 */
+.work-trace-event-item {
+  margin-bottom: 8px;
+  padding: 8px;
+  background: white;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.work-trace-event-item:last-child {
+  margin-bottom: 0;
+}
+
+/* 新增：事件类型标签 */
+.event-detail {
+  font-size: 11px;
+  line-height: 1.5;
+}
+.event-type {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--ink);
+}
+.event-content {
+  color: var(--ink-muted);
+}
+.event-content strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+.event-content pre {
+  margin: 4px 0 0;
+  padding: 6px;
+  background: #f5f5f5;
+  border-radius: 3px;
+  overflow-x: auto;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.event-content ul {
+  margin: 4px 0 0;
+  padding-left: 16px;
+}
+.event-content li {
+  margin-bottom: 2px;
+}
+
+/* 新增：错误和警告样式 */
+.event-error .event-type {
+  color: #bc5b50;
+}
+.event-error {
+  border-left: 2px solid #bc5b50;
+  padding-left: 8px;
+}
+.event-warning .event-type {
+  color: #d97706;
+}
+.event-warning {
+  border-left: 2px solid #d97706;
+  padding-left: 8px;
+}
+
+/* 新增：商品预览列表 */
+.event-hits-preview {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.1);
+}
+.event-hits-preview ul {
+  list-style: none;
+  padding-left: 0;
+}
+.event-hits-preview li {
+  padding: 2px 0;
+  font-size: 10px;
+  color: var(--ink-muted);
+}
+
 .composer-shell {
   flex: 0 0 auto;
   width: min(100%, 760px);

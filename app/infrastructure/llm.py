@@ -72,7 +72,10 @@ class ThrottledChatModel(OpenAIChatModel):
             await slot.__aexit__(*sys.exc_info())
             raise
 
-        if not hasattr(result, "__aiter__"):
+        # 使用类型级别的 __aiter__ 检查，避免实例级 hasattr/getattr 触发非标准 __getattr__ 的 KeyError
+        is_stream = getattr(type(result), "__aiter__", None) is not None
+        
+        if not is_stream:
             await slot.__aexit__(None, None, None)
             _charge_budget(result)
             return result

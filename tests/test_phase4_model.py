@@ -164,3 +164,111 @@ class TestRetryAndFallback:
         model = _build([RuntimeError("429 rate limit")] * 2, retries=1)
         with pytest.raises(RuntimeError, match="429"):
             await model([])
+
+
+class StubResponseWithKeyErrorGetAttr:
+    """模拟某些 LLM response object 的非标准 __getattr__：对未知属性抛 KeyError。
+    
+    这是 DeepSeek V4-Pro + AgentScope 组合中观察到的行为：
+    hasattr(obj, "__aiter__") 会触发 obj.__getattr__("__aiter__")，
+    而该实现抛出 KeyError 而非 AttributeError，导致 hasattr() 崩溃。
+    """
+    
+    def __init__(self, content: str = "test-response"):
+        self.content = content
+    
+    def __getattr__(self, name: str):
+        # 非标准实现：抛 KeyError 而不是 AttributeError
+        raise KeyError(f"Attribute '{name}' not found")
+
+
+class TestThrottledChatModelKeyErrorCompatibility:
+    """回归测试：确保 ThrottledChatModel 能处理 __getattr__ 抛 KeyError 的 response object。"""
+    
+    async def test_non_stream_response_with_keyerror_getattr_does_not_crash(self):
+        """CASE A: 普通 response object，其 __getattr__ 对未知字段抛 KeyError。
+        
+        期望：ThrottledChatModel 不崩溃，按 non-stream response 处理。
+        """
+        throttle = GatewayThrottle(max_concurrency=1, min_interval_seconds=0)
+        
+        class StubModelWithKeyErrorResponse(StubUpstreamModel):
+            async def _invoke_upstream(self, messages, tools, tool_choice, **kwargs):
+                # 返回一个 __getattr__ 抛 KeyError 的对象
+                return StubResponseWithKeyErrorGetAttr(content="OK")
+        
+        model = StubModelWithKeyErrorResponse(
+            behaviors=[],
+            credential=_CREDENTIAL,
+            model="test-model",
+            throttle=throttle,
+        )
+        
+        # 应该不崩溃，正常返回 response
+        result = await model([])
+        assert isinstance(result, StubResponseWithKeyErrorGetAttr)
+        assert result.content == "OK"
+    
+    async def test_async_generator_still_detected_as_stream(self):
+        """CASE B: 真正 async iterator / async generator。
+        
+        期望：识别为 stream，走 _release_after_stream。
+        """
+        throttle = GatewayThrottle(max_concurrency=1, min_interval_seconds=0)
+        
+        class StubModelWithAsyncGen(StubUpstreamModel):
+            async def _invoke_upstream(self, messages, tools, tool_choice, **kwargs):
+                # Return an actual async generator, not a coroutine
+                async def inner_gen():
+                    for i in range(3):
+                        yield f"chunk-{i}"
+                return inner_gen()
+        
+        model = StubModelWithAsyncGen(
+            behaviors=[],
+            credential=_CREDENTIAL,
+            model="test-model",
+            throttle=throttle,
+        )
+        
+        # 应该识别为 stream 并正确消费
+        chunks = []
+        result = await model([])  # __call__ is async, need to await it
+        
+        # Now check if result is an async generator
+        import inspect
+        if inspect.isasyncgen(result):
+            async for chunk in result:
+                chunks.append(chunk)
+        else:
+            # If not a stream, result should be the response object itself
+            raise AssertionError(f"Expected async generator but got {type(result)}")
+        
+        assert chunks == ["chunk-0", "chunk-1", "chunk-2"]
+    
+    async def test_slot_released_for_non_stream_with_keyerror_getattr(self):
+        """CASE C: 确保 slot 在 non-stream 返回后正常释放。"""
+        throttle = GatewayThrottle(max_concurrency=1, min_interval_seconds=0)
+        
+        call_count = 0
+        
+        class StubModelWithKeyErrorResponse(StubUpstreamModel):
+            async def _invoke_upstream(self, messages, tools, tool_choice, **kwargs):
+                nonlocal call_count
+                call_count += 1
+                return StubResponseWithKeyErrorGetAttr(content=f"response-{call_count}")
+        
+        model = StubModelWithKeyErrorResponse(
+            behaviors=[],
+            credential=_CREDENTIAL,
+            model="test-model",
+            throttle=throttle,
+        )
+        
+        # 连续调用两次，如果第一次没释放 slot，第二次会超时
+        result1 = await model([])
+        result2 = await model([])
+        
+        assert result1.content == "response-1"
+        assert result2.content == "response-2"
+        assert call_count == 2
