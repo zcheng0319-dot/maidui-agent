@@ -2377,3 +2377,345 @@ main {
   .home-logo-img { width: 36px; height: 36px; }
 }
 
+/* ============================================================
+   Active Session 布局（PHASE B1）
+   - 顶部 header + 左右 split panel
+   - History drawer（从左侧滑入）
+   ============================================================ */
+.session-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  background: transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+.session-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 56px;
+  padding: 0 16px 0 12px;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.85);
+  position: relative;
+  z-index: 5;
+}
+
+.session-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.session-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.session-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.session-menu-btn:hover {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(255, 255, 255, 0.95);
+  color: var(--accent);
+}
+.session-menu-btn:active {
+  background: color-mix(in oklab, var(--accent) 12%, transparent);
+}
+
+.session-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.session-brand-img {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  box-shadow: var(--shadow-soft);
+  object-fit: cover;
+}
+.session-brand-text {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.session-divider-line {
+  width: 1px;
+  height: 18px;
+  background: rgba(20, 24, 38, 0.12);
+  flex-shrink: 0;
+}
+
+.session-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: color-mix(in oklab, var(--ink) 75%, transparent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.session-conn-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.session-conn-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 20%, transparent);
+}
+.session-conn-on .session-conn-dot {
+  background: var(--accent);
+  animation: pulse-dot 1.6s ease-in-out infinite;
+}
+.session-conn-connecting .session-conn-dot {
+  background: #d6a32a;
+}
+.session-conn-off .session-conn-dot {
+  background: #c44b4b;
+}
+.session-conn-label { color: inherit; }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.session-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.session-left,
+.session-right {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+}
+.session-left {
+  flex-grow: 0;
+  flex-shrink: 0;
+}
+.session-right {
+  flex-grow: 1;
+  flex-shrink: 1;
+}
+
+.session-divider {
+  flex: 0 0 8px;
+  cursor: col-resize;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  touch-action: none;
+  user-select: none;
+}
+.session-divider::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: rgba(20, 24, 38, 0.08);
+  transform: translateX(-50%);
+  transition: background 0.15s ease;
+}
+.session-divider:hover::before,
+.session-divider:active::before {
+  background: color-mix(in oklab, var(--accent) 50%, transparent);
+}
+.session-divider-grip {
+  position: relative;
+  width: 4px;
+  height: 32px;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--ink) 18%, transparent);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.session-divider:hover .session-divider-grip,
+.session-divider:active .session-divider-grip {
+  background: var(--accent);
+  transform: scaleY(1.1);
+}
+
+.is-split-dragging {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+.is-split-dragging *,
+.is-split-dragging *::before,
+.is-split-dragging *::after {
+  user-select: none !important;
+  pointer-events: none;
+}
+.is-split-dragging .session-divider,
+.is-split-dragging .session-divider * {
+  pointer-events: auto !important;
+}
+
+/* History Drawer */
+.history-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 18, 28, 0.32);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 40;
+  animation: fade-in 0.18s ease;
+}
+.history-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 280px;
+  max-width: 88vw;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border-right: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 18px 48px rgba(20, 24, 38, 0.18);
+  animation: drawer-slide-in 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.history-drawer .history-sidebar {
+  width: 100%;
+  border-right: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  height: 100%;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes drawer-slide-in {
+  from { transform: translateX(-12px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+/* Active Session 响应式：< 900px 不再拖拽，右栏沉到底部 */
+@media (max-width: 900px) {
+  .session-body {
+    flex-direction: column;
+  }
+  .session-left,
+  .session-right {
+    flex-basis: auto !important;
+    width: 100%;
+    max-height: none;
+  }
+  .session-left {
+    height: 55vh;
+    border-bottom: 1px solid rgba(20, 24, 38, 0.06);
+  }
+  .session-right {
+    height: 45vh;
+  }
+  .session-divider {
+    display: none;
+  }
+}
+
+/* ============================================================
+   Session 内现有 .chat / .turns / .composer 适配
+   - 让 .chat 占满 .session-left 高度
+   - .turns 自适应伸展，原有 250–500px 区间不再生效
+   - composer 留在底部
+   ============================================================ */
+.session-left .chat {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 18px 18px 0;
+  animation: none;
+}
+.session-left .turns {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+.session-left .composer {
+  flex-shrink: 0;
+  margin-top: 12px;
+  margin-bottom: 16px;
+}
+
+.session-right-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 18px;
+  gap: 12px;
+}
+.session-right-wrap .agent-panel {
+  flex: 1;
+}
+.session-right-hint {
+  font-size: 12px;
+  color: color-mix(in oklab, var(--ink) 55%, transparent);
+  text-align: center;
+  margin: 0;
+  padding: 12px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px dashed rgba(20, 24, 38, 0.12);
+}
+

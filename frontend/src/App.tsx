@@ -3,6 +3,7 @@ import AgentPanel from "./components/AgentPanel";
 import ProductCards from "./components/ProductCards";
 import HomeView from "./components/HomeView";
 import HistorySidebar from "./components/HistorySidebar";
+import SessionView from "./components/SessionView";
 import MaiduiMock from "./MaiduiMock";
 import { currentThinkingText } from "./agentSteps";
 import type { TradeEvent } from "./types";
@@ -32,8 +33,6 @@ interface Turn {
   text: string;
 }
 
-const CAPABILITY_TAGS = ["智能筛选", "参数对比", "实时决策"];
-
 /** 输入框内的轻量辅助提示（仅视觉，不触发真实筛选）。 */
 const QUICK_PROMPTS = ["预算", "场景", "偏好"];
 
@@ -45,26 +44,6 @@ const FALLBACK_STAGES = [
   "正在比较参数",
   "正在整理推荐",
 ];
-
-function ConnectionChip({ connected, connecting }: { connected: boolean; connecting: boolean }) {
-  let cls = "chip";
-  let label = "Agent 在线";
-  if (connecting) {
-    cls = "chip chip-connecting";
-    label = "连接中";
-  } else if (!connected) {
-    cls = "chip chip-off";
-    label = "实时连接已断开";
-  } else {
-    cls = "chip chip-on";
-  }
-  return (
-    <span className={cls} title={label}>
-      <span className="chip-dot" />
-      {label}
-    </span>
-  );
-}
 
 /** 左侧 Thinking 卡片：文案优先绑定真实活跃 step，否则用兜底轮播。 */
 function ThinkingCard({ text, active }: { text: string | null; active: boolean }) {
@@ -219,7 +198,16 @@ export default function App() {
   // PHASE B0：「新对话」= 重新挂载 HomeView 清理本地输入框
   const handleNewChat = () => {
     setHomeKey((k) => k + 1);
+    setView("home");
   };
+
+  // PHASE B1：最新一条买家 query，用作 Session header 标题
+  const latestBuyerQuery = (() => {
+    for (let i = turns.length - 1; i >= 0; i -= 1) {
+      if (turns[i].role === "buyer") return turns[i].text;
+    }
+    return undefined;
+  })();
 
   // PHASE B0：Home 视图直接返回；不在此分支触发现有 WS / events / turns 渲染。
   if (view === "home") {
@@ -231,97 +219,82 @@ export default function App() {
     );
   }
 
-  return (
-    <div className="layout">
-      <header className="hero">
-        <div className="brand-block">
-          <div className="brand-mark" role="img" aria-label="买对 App 图标">
-            <img src="/logo-main.png" alt="" className="brand-mark-img" />
+  // PHASE B1：Active Session 走 SessionView 骨架，原 chat 内容作 left，原 AgentPanel 作 right。
+  const leftContent = (
+    <section className="chat">
+      <div className="turns">
+        {turns.map((turn, index) => (
+          <div key={index} className={`turn ${turn.role}`}>
+            <div className="who">{turn.role === "buyer" ? "我" : <img src="/bot.png" alt="" className="who-img" />}</div>
+            <div className="text">{turn.text}</div>
           </div>
-          <div className="brand-text">
-            <div className="brand-title-row">
-              <h1 className="brand-title">买对</h1>
-              <span className="brand-sub">AI 智能选购助手</span>
-            </div>
-            <p className="brand-value">帮你筛选、比较、决策，再下单。</p>
-            <div className="capability-tags">
-              {CAPABILITY_TAGS.map((tag) => (
-                <span key={tag} className="cap-tag">
-                  {tag}
-                </span>
-              ))}
-            </div>
+        ))}
+        {streaming && (
+          <div className="turn agent streaming">
+            <div className="who"><img src="/bot.png" alt="" className="who-img" /></div>
+            <div className="text">{streaming}</div>
           </div>
-        </div>
+        )}
+      </div>
 
-        <div className="hero-meta">
-          <ConnectionChip connected={connected} connecting={connecting} />
-          <div className="hero-meta-row">
-            <span className="meta-pill">会话 {sessionId}</span>
-            <span className="meta-pill">买家 {buyerId}</span>
-          </div>
-        </div>
-      </header>
+      <ThinkingCard text={thinkText} active={showThinking} />
 
-      <main>
-        <section className="chat">
-          <div className="turns">
-            {turns.map((turn, index) => (
-              <div key={index} className={`turn ${turn.role}`}>
-                <div className="who">{turn.role === "buyer" ? "我" : <img src="/bot.png" alt="" className="who-img" />}</div>
-                <div className="text">{turn.text}</div>
-              </div>
+      <ProductCards events={events} />
+
+      <div className="composer">
+        <div className="composer-input">
+          <textarea
+            value={input}
+            placeholder="告诉我你想买什么，例如：800 元以内适合通勤的降噪耳机"
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void submit();
+              }
+            }}
+          />
+          <div className="composer-chips">
+            {QUICK_PROMPTS.map((chip) => (
+              <button
+                key={chip}
+                type="button"
+                className="composer-chip"
+                onClick={() => setInput((prev) => (prev ? `${prev} ` : "") + chip)}
+              >
+                {chip}
+              </button>
             ))}
-            {streaming && (
-              <div className="turn agent streaming">
-                <div className="who"><img src="/bot.png" alt="" className="who-img" /></div>
-                <div className="text">{streaming}</div>
-              </div>
-            )}
           </div>
+        </div>
+        <button
+          onClick={() => void submit()}
+          disabled={busy || !input.trim()}
+          className={busy ? "is-busy" : ""}
+        >
+          {busy ? "处理中" : "发送"}
+        </button>
+      </div>
+    </section>
+  );
 
-          <ThinkingCard text={thinkText} active={showThinking} />
-
-          <ProductCards events={events} />
-
-          <div className="composer">
-            <div className="composer-input">
-              <textarea
-                value={input}
-                placeholder="告诉我你想买什么，例如：800 元以内适合通勤的降噪耳机"
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    void submit();
-                  }
-                }}
-              />
-              <div className="composer-chips">
-                {QUICK_PROMPTS.map((chip) => (
-                  <button
-                    key={chip}
-                    type="button"
-                    className="composer-chip"
-                    onClick={() => setInput((prev) => (prev ? `${prev} ` : "") + chip)}
-                  >
-                    {chip}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <button
-              onClick={() => void submit()}
-              disabled={busy || !input.trim()}
-              className={busy ? "is-busy" : ""}
-            >
-              {busy ? "处理中" : "发送"}
-            </button>
-          </div>
-        </section>
-
-        <AgentPanel events={events} />
-      </main>
+  // 右栏占位：保留真实 AgentPanel，避免一次性把右侧也清空（B1 只做 layout）
+  const rightContent = (
+    <div className="session-right-wrap">
+      <AgentPanel events={events} />
+      <p className="session-right-hint">商品研究区将在后续阶段接入真实候选数据。</p>
     </div>
+  );
+
+  return (
+    <SessionView
+      left={leftContent}
+      right={rightContent}
+      title={latestBuyerQuery}
+      connected={connected}
+      connecting={connecting}
+      buyerName={buyerId}
+      onNewChat={handleNewChat}
+    />
   );
 }
