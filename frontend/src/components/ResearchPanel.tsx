@@ -1,8 +1,8 @@
 import { useMemo, useState, type CSSProperties } from "react";
-import { getLatestProductHitsForCurrentTurn, latestFinalText } from "../productData";
+import { getLatestProductHitsForCurrentTurn } from "../productData";
 import type { ProductCard, TradeEvent } from "../types";
 
-export type ResearchTab = "candidates" | "comparison" | "recommendation";
+export type ResearchTab = "candidates" | "comparison";
 
 interface ResearchPanelProps {
   events: TradeEvent[];
@@ -13,7 +13,6 @@ interface ResearchPanelProps {
 const TAB_LABELS: Array<{ key: ResearchTab; label: string }> = [
   { key: "candidates", label: "候选商品" },
   { key: "comparison", label: "参数对比" },
-  { key: "recommendation", label: "买对建议" },
 ];
 
 function formatPrice(card: ProductCard): string {
@@ -139,7 +138,6 @@ export default function ResearchPanel({ events, activeTab, onTabChange }: Resear
   const allCards = useMemo(() => getLatestProductHitsForCurrentTurn(events), [events]);
   const cards = useMemo(() => allCards.slice(0, 3), [allCards]);
   
-  const finalText = useMemo(() => latestFinalText(events), [events]);
   const searching = isProductSearchActive(events);
   const lowestPrice = cards.length > 1 ? Math.min(...cards.map((card) => card.price_major)) : null;
   const richestHighlights = Math.max(0, ...cards.map((card) => card.highlights?.length ?? 0));
@@ -199,18 +197,6 @@ export default function ResearchPanel({ events, activeTab, onTabChange }: Resear
 
         {activeTab === "comparison" && <ComparisonView cards={comparisonCards} />}
 
-        {activeTab === "recommendation" && (
-          finalText ? (
-            <article className="recommendation-view">
-              <p className="recommendation-kicker">买对建议</p>
-              <div className="recommendation-text">{finalText}</div>
-              <div className="recommendation-actions">
-                {cards.length > 0 && <button type="button" onClick={() => onTabChange("candidates")}>查看候选商品</button>}
-                {cards.length >= 2 && <button type="button" onClick={() => onTabChange("comparison")}>查看参数对比</button>}
-              </div>
-            </article>
-          ) : <p className="research-empty">买对完成分析后，会在这里整理推荐结论。</p>
-        )}
       </div>
     </aside>
   );
