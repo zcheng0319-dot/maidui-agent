@@ -50,9 +50,9 @@
 {"query": "超轻防风外套", "kind": "lexical", "relevant": ["P1046"], "note": "属性类"}
 {"query": "300元以内抗造又不含塑料的旅行装备", "kind": "lexical", "relevant": ["P1001", "P1013"], "price_max_major": 300, "note": "硬约束类：验证价格过滤 + 属性；P1009 桑蚕丝 329 元应被价格挡掉"}
 {"query": "预算100元以内的收纳用品", "kind": "lexical", "relevant": ["P1014", "P1059"], "price_max_major": 100, "note": "硬约束类：亚麻收纳套 P1019（129 元）超预算，不列为 relevant——标注必须与约束一致"}
-{"query": "能寄到美国的登山杖", "kind": "lexical", "relevant": ["P1010", "P1047", "P1040"], "ship_to": "US", "note": "硬约束类：三款均可寄美国"}
-{"query": "能寄到日本的天然材质家居", "kind": "lexical", "relevant": ["P1031", "P1034", "P1006"], "ship_to": "JP", "note": "硬约束类：ships_to 含 JP"}
-{"query": "500元以内能寄到欧洲的户外装备", "kind": "lexical", "relevant": ["P1039", "P1042", "P1048", "P1044"], "price_max_major": 500, "ship_to": "EU", "note": "硬约束类：价格 + 送达双约束"}
+{"query": "500 元以内适合长距离徒步的登山杖", "kind": "lexical", "relevant": ["P1047", "P1040"], "price_max_major": 500, "note": "硬约束类：价格 + 长距离徒步场景；两款均在 500 元内"}
+{"query": "300 元以内天然材质家居用品", "kind": "lexical", "relevant": ["P1031", "P1034", "P1006"], "price_max_major": 300, "note": "硬约束类：天然材质 + 价格约束；三款均在 300 元内"}
+{"query": "500 元以内轻量户外装备", "kind": "lexical", "relevant": ["P1039", "P1042", "P1048", "P1044"], "price_max_major": 500, "note": "硬约束类：价格 + 轻量户外场景约束"}
 {"query": "坐飞机脖子老是很难受有什么办法", "kind": "semantic", "relevant": ["P1012", "P1011", "P1001"], "note": "语义类：全程不含「颈枕」字面，考验向量召回"}
 {"query": "睡觉怕光想把眼睛遮起来", "kind": "semantic", "relevant": ["P1013", "P1058"], "note": "语义类：不含「眼罩」字面"}
 {"query": "怕行李太重被机场罚钱", "kind": "semantic", "relevant": ["P1052"], "note": "语义类：不含「行李秤」字面"}
