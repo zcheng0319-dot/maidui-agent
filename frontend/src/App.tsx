@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import AgentPanel from "./components/AgentPanel";
 import ProductCards from "./components/ProductCards";
-import WelcomeState from "./components/WelcomeState";
+import HomeView from "./components/HomeView";
+import HistorySidebar from "./components/HistorySidebar";
 import MaiduiMock from "./MaiduiMock";
 import { currentThinkingText } from "./agentSteps";
 import type { TradeEvent } from "./types";
@@ -119,6 +120,10 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(true);
+  // PHASE B0：Home ↔ Session 视图切换。Home 不直连 WS（实际连接由 Session 进入后保持复用）。
+  const [view, setView] = useState<"home" | "session">("home");
+  // PHASE B0：触发 HomeView 重新挂载以清空其内部输入框状态（不引入多 session 系统）
+  const [homeKey, setHomeKey] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
 
   // 绑定真实事件 → 思考文案
@@ -204,7 +209,27 @@ export default function App() {
     }
   };
 
-  const isEmpty = turns.length === 0 && !streaming && !busy;
+  // PHASE B0：Home → Session 切换 + 复用现有 submit(override)
+  const handleStart = async (query: string) => {
+    if (!query.trim()) return;
+    setView("session");
+    await submit(query);
+  };
+
+  // PHASE B0：「新对话」= 重新挂载 HomeView 清理本地输入框
+  const handleNewChat = () => {
+    setHomeKey((k) => k + 1);
+  };
+
+  // PHASE B0：Home 视图直接返回；不在此分支触发现有 WS / events / turns 渲染。
+  if (view === "home") {
+    return (
+      <div className="layout-home">
+        <HistorySidebar buyerName={buyerId} onNewChat={handleNewChat} />
+        <HomeView key={homeKey} onStart={handleStart} busy={busy} />
+      </div>
+    );
+  }
 
   return (
     <div className="layout">
@@ -240,24 +265,20 @@ export default function App() {
 
       <main>
         <section className="chat">
-          {isEmpty ? (
-            <WelcomeState onPick={(t) => setInput(t)} />
-          ) : (
-            <div className="turns">
-              {turns.map((turn, index) => (
-                <div key={index} className={`turn ${turn.role}`}>
-                  <div className="who">{turn.role === "buyer" ? "我" : <img src="/bot.png" alt="" className="who-img" />}</div>
-                  <div className="text">{turn.text}</div>
-                </div>
-              ))}
-              {streaming && (
-                <div className="turn agent streaming">
-                  <div className="who"><img src="/bot.png" alt="" className="who-img" /></div>
-                  <div className="text">{streaming}</div>
-                </div>
-              )}
-            </div>
-          )}
+          <div className="turns">
+            {turns.map((turn, index) => (
+              <div key={index} className={`turn ${turn.role}`}>
+                <div className="who">{turn.role === "buyer" ? "我" : <img src="/bot.png" alt="" className="who-img" />}</div>
+                <div className="text">{turn.text}</div>
+              </div>
+            ))}
+            {streaming && (
+              <div className="turn agent streaming">
+                <div className="who"><img src="/bot.png" alt="" className="who-img" /></div>
+                <div className="text">{streaming}</div>
+              </div>
+            )}
+          </div>
 
           <ThinkingCard text={thinkText} active={showThinking} />
 

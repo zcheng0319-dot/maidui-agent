@@ -1960,3 +1960,420 @@ main {
   .mock-main, .mock-hero, .mock-commandbar, .mock-footer { padding-left: 20px; padding-right: 20px; }
 }
 
+/* ============================================================
+   买对 · Lovable 视觉 Shell（PHASE B0）
+   仅追加：不替换 .layout / .hero / .chat / .composer 等会话类。
+   本块提供：lavender accent tokens、ambient orb、glass、fade-up、
+   Home + History Sidebar 的视觉规格。
+   ============================================================ */
+
+:root {
+  --accent: oklch(0.64 0.14 285);          /* 主 lavender */
+  --accent-soft: oklch(0.96 0.018 287);    /* 浅紫背景 */
+  --accent-strong: oklch(0.72 0.11 292);   /* 副 lavender */
+  --warm: oklch(0.756 0.084 71);           /* 暖琥珀 */
+  --warm-soft: oklch(0.972 0.017 78);
+  --surface-home: oklch(0.985 0.006 285);  /* Home 背景：偏冷的近白 */
+  --ink: oklch(0.205 0 0);                 /* 主文字 */
+  --ink-muted: oklch(0.556 0 0);           /* 次级文字 */
+  --line-soft: oklch(0.93 0 0);
+
+  --shadow-soft: 0 1px 2px rgba(23, 23, 23, 0.04);
+  --shadow-float: 0 2px 6px rgba(23, 23, 23, 0.05), 0 16px 40px -24px rgba(23, 23, 23, 0.3);
+  --shadow-glow: 0 0 0 1px rgba(139, 92, 246, 0.16),
+                 0 12px 40px -16px rgba(139, 92, 246, 0.35);
+
+  --radius-home-sm: 10px;
+  --radius-home-md: 14px;
+  --radius-home-lg: 18px;
+  --radius-home-xl: 24px;
+}
+
+/* ---- ambient orb（背景浮动光晕，Home 用）---- */
+.ambient-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(60px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.85;
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(0, -18px, 0) scale(1.06); }
+}
+@keyframes float-slower {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.05); }
+  50%      { transform: translate3d(-20px, 24px, 0) scale(0.95); }
+}
+@keyframes float-reverse {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50%      { transform: translate3d(18px, -18px, 0) rotate(180deg); }
+}
+
+.animate-float-slow      { animation: float-slow 12s ease-in-out infinite; }
+.animate-float-slower    { animation: float-slower 16s ease-in-out infinite; }
+.animate-float-reverse   { animation: float-reverse 18s ease-in-out infinite; }
+
+/* ---- fade-up 入场动画 ---- */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.animate-fade-up { animation: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* ---- glass surface（Home 卡片用）---- */
+.glass-strong {
+  background-color: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+
+/* ---- ink gradient（标题）---- */
+.text-gradient-ink {
+  background-image: linear-gradient(120deg, var(--ink) 20%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ============================================================
+   Home Layout（PHASE B0）
+   ============================================================ */
+.layout-home {
+  display: flex;
+  height: 100vh;
+  min-height: 100vh;
+  background: var(--surface-home);
+  overflow: hidden;
+  position: relative;
+  font-family: system-ui, "Noto Sans SC", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+.home-main {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  overflow: hidden;
+}
+
+.home-canvas {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  z-index: 1;
+}
+
+/* hero */
+.home-hero {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.home-logo-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+.home-logo-img {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  box-shadow: var(--shadow-soft);
+  object-fit: cover;
+}
+.home-title {
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.home-eyebrow {
+  font-size: 13.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--ink-muted);
+  margin: 4px 0 14px;
+}
+.home-tagline {
+  font-size: 17px;
+  color: color-mix(in oklab, var(--ink) 70%, transparent);
+  margin: 0;
+}
+
+/* input card */
+.home-input-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.78);
+  border-radius: var(--radius-home-xl);
+  padding: 12px;
+  box-shadow: var(--shadow-soft);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+.home-input-card:focus-within {
+  box-shadow: var(--shadow-glow);
+  border-color: color-mix(in oklab, var(--accent) 30%, transparent);
+}
+.home-input {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  padding: 12px 12px 6px;
+  font-size: 15.5px;
+  color: var(--ink);
+  resize: none;
+  font-family: inherit;
+  line-height: 1.5;
+}
+.home-input::placeholder {
+  color: color-mix(in oklab, var(--ink-muted) 80%, transparent);
+}
+.home-input-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 4px 0;
+  gap: 12px;
+}
+.home-input-hint {
+  font-size: 12px;
+  color: color-mix(in oklab, var(--ink-muted) 80%, transparent);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.home-input-hint svg {
+  color: var(--accent);
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+.home-input-submit {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--ink);
+  color: var(--surface, #fff);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  box-shadow: var(--shadow-float);
+  font-family: inherit;
+}
+.home-input-submit:hover:not(:disabled) {
+  transform: scale(1.05);
+}
+.home-input-submit:active:not(:disabled) {
+  transform: scale(0.95);
+}
+.home-input-submit:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* suggested prompts */
+.home-prompts {
+  margin-top: 32px;
+}
+.home-prompts-label {
+  font-size: 12.5px;
+  color: var(--ink-muted);
+  margin: 0 0 12px;
+}
+.home-prompts-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.home-prompt-chip {
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 999px;
+  font-size: 13.5px;
+  color: color-mix(in oklab, var(--ink) 80%, transparent);
+  cursor: pointer;
+  transition: transform 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  font-family: inherit;
+  animation: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.home-prompt-chip:hover {
+  transform: translateY(-2px);
+  color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 30%, transparent);
+  box-shadow: var(--shadow-soft);
+}
+.home-prompt-chip:active {
+  transform: translateY(0);
+}
+
+/* ============================================================
+   History Sidebar（PHASE B0）
+   ============================================================ */
+.history-sidebar {
+  width: 264px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 12px;
+  border-right: 1px solid rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  overflow: hidden;
+  position: relative;
+  z-index: 2;
+}
+.history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  margin-bottom: 16px;
+}
+.history-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.history-brand-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  box-shadow: var(--shadow-soft);
+  object-fit: cover;
+}
+.history-brand-text {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.history-new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  border-radius: var(--radius-home-md);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: var(--shadow-soft);
+  transition: background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+  font-family: inherit;
+}
+.history-new:hover {
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(23, 23, 23, 0.04), 0 4px 12px rgba(23, 23, 23, 0.08);
+  border-color: color-mix(in oklab, var(--accent) 20%, transparent);
+}
+.history-new:active {
+  transform: scale(0.98);
+}
+.history-new-icon {
+  color: var(--accent);
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.history-section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-muted);
+  padding: 0 8px;
+  margin: 0 0 8px;
+}
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+.history-empty {
+  padding: 4px 8px 12px;
+}
+.history-empty-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: color-mix(in oklab, var(--ink) 80%, transparent);
+  font-weight: 500;
+}
+.history-empty-desc {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+  line-height: 1.5;
+}
+
+.history-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--radius-home-md);
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  margin-top: 16px;
+}
+.history-user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid color-mix(in oklab, var(--accent) 20%, transparent);
+}
+.history-user-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+/* ============================================================
+   Responsive（窄屏下 sidebar 隐藏 + canvas padding 收紧）
+   ============================================================ */
+@media (max-width: 768px) {
+  .layout-home { flex-direction: column; }
+  .history-sidebar {
+    width: 100%;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.85);
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+  }
+  .history-head { margin-bottom: 0; }
+  .history-new { width: auto; padding: 6px 12px; margin-bottom: 0; }
+  .history-section-title, .history-list { display: none; }
+  .history-user { margin-top: 0; padding: 6px; }
+  .home-main { padding: 24px 20px; }
+  .home-title { font-size: 32px; }
+  .home-logo-img { width: 36px; height: 36px; }
+}
+
