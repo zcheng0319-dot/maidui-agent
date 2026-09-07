@@ -1,5 +1,45 @@
 import type { ProductCard, TradeEvent } from "./types";
 
+/**
+ * 获取当前 turn 中最新一次 product_search_tool 的 hits。
+ * 
+ * Current turn 定义：从上一条 final.result 之后到当前。
+ * 如果没有 final.result，则从 session 开始算起。
+ */
+export function getLatestProductHitsForCurrentTurn(events: TradeEvent[]): ProductCard[] {
+  // 找到最后一条 final.result 的位置
+  let start = 0;
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    if (events[index].type === "final.result") {
+      start = index + 1;
+      break;
+    }
+  }
+  
+  // 只搜索当前 turn 的 events
+  const currentTurnEvents = events.slice(start);
+  
+  // 从后往前找最新一次 product_search_tool 的 tool.result
+  for (let index = currentTurnEvents.length - 1; index >= 0; index -= 1) {
+    const event = currentTurnEvents[index];
+    if (event.type !== "tool.result") continue;
+    
+    const toolName = String(event.payload?.tool ?? "").toLowerCase();
+    if (!/product_search/.test(toolName)) continue;
+    
+    const hits = event.payload?.hits as ProductCard[] | undefined;
+    if (Array.isArray(hits) && hits.length > 0) {
+      return hits;
+    }
+  }
+  
+  return [];
+}
+
+/**
+ * 向后兼容：保留原有的 latestCards 函数，但标记为 deprecated。
+ * 新代码应使用 getLatestProductHitsForCurrentTurn。
+ */
 export function latestCards(events: TradeEvent[]): ProductCard[] {
   for (let index = events.length - 1; index >= 0; index -= 1) {
     const event = events[index];

@@ -1,5 +1,5 @@
 import { useMemo, useState, type CSSProperties } from "react";
-import { extractKnownSpecs, latestCards, latestFinalText } from "../productData";
+import { getLatestProductHitsForCurrentTurn, latestFinalText } from "../productData";
 import type { ProductCard, TradeEvent } from "../types";
 
 export type ResearchTab = "candidates" | "comparison" | "recommendation";
@@ -54,72 +54,91 @@ function CandidateCard({
   onToggle: () => void;
   onCompare: () => void;
 }) {
-  const highlights = card.highlights?.slice(0, 3) ?? [];
+  const style: CSSProperties = {
+    "--candidate-lowest": lowestPrice ? 1 : 0,
+    "--candidate-rich": informationRich ? 1 : 0,
+    "--candidate-selected": selected ? 1 : 0,
+  } as CSSProperties;
+
   return (
-    <article className="candidate-card">
-      <div className="candidate-image" aria-hidden="true">{(card.title || card.brand || "?").trim().charAt(0)}</div>
-      <div className="candidate-meta">
-        <p className="candidate-brand">{card.brand || "未知品牌"}</p>
-        <h3>{card.title || "未命名商品"}</h3>
-        <p className="candidate-price">{formatPrice(card)}</p>
-        <div className="candidate-tags">
-          {lowestPrice && <span>最低价格</span>}
-          {informationRich && <span>信息较完整</span>}
-          {card.category && <span>{card.category}</span>}
+    <article className="candidate-card" style={style}>
+      <header className="candidate-head">
+        <div>
+          <p className="candidate-category">{card.category}</p>
+          <h3>{card.title}</h3>
         </div>
-        {highlights.length > 0 && (
-          <ul className="candidate-highlights">
-            {highlights.map((highlight, index) => <li key={`${highlight}-${index}`}>{highlight}</li>)}
-          </ul>
-        )}
-        {card.skus?.length > 0 && <p className="candidate-skus">{stockSummary(card)}</p>}
-        <div className="candidate-actions">
-          <button type="button" onClick={onToggle}>{selected ? "移出对比" : "加入对比"}</button>
-          <button type="button" onClick={onCompare}>查看参数</button>
-        </div>
-      </div>
+        <span className="candidate-price">{formatPrice(card)}</span>
+      </header>
+      <ul className="candidate-highlights">
+        {(card.highlights ?? []).slice(0, 3).map((highlight, index) => (
+          <li key={index}>{highlight}</li>
+        ))}
+      </ul>
+      <footer className="candidate-foot">
+        <button type="button" onClick={onToggle} aria-pressed={selected}>
+          {selected ? "取消对比" : "加入对比"}
+        </button>
+        <button type="button" onClick={onCompare}>查看对比</button>
+      </footer>
     </article>
   );
 }
 
 function ComparisonView({ cards }: { cards: ProductCard[] }) {
-  if (cards.length === 0) return <p className="research-empty">找到多个候选后，可以在这里对比参数。</p>;
+  if (cards.length === 0) {
+    return <p className="research-empty">请先从候选中选择最多 3 款商品进行对比。</p>;
+  }
 
-  const rows = [
-    { label: "价格", values: cards.map(formatPrice) },
-    { label: "品牌", values: cards.map((card) => card.brand || "未知") },
-    { label: "品类", values: cards.map((card) => card.category || "未知") },
-    { label: "库存", values: cards.map(stockSummary) },
-    { label: "产地", values: cards.map((card) => card.origin_country || "未知") },
-    { label: "重量", values: cards.map((card) => extractKnownSpecs(card).weight ?? "未知") },
-    { label: "材质", values: cards.map((card) => extractKnownSpecs(card).material ?? "未知") },
-    { label: "折叠长度", values: cards.map((card) => extractKnownSpecs(card).foldedLength ?? "未知") },
-  ];
+  const specs = ["title", "category", "price_major"];
+  const labels: Record<string, string> = {
+    title: "商品名称",
+    category: "品类",
+    price_major: "价格",
+  };
 
   return (
-    <div
-      className="comparison-grid"
-      role="table"
-      aria-label="候选商品参数对比"
-      style={{ "--comparison-columns": cards.length } as CSSProperties}
-    >
-      <div className="comparison-row comparison-header" role="row">
-        <div className="comparison-cell" role="columnheader">参数</div>
-        {cards.map((card) => <div className="comparison-cell" role="columnheader" key={card.product_id}>{card.title || "未命名商品"}</div>)}
-      </div>
-      {rows.map((row) => (
-        <div className="comparison-row" role="row" key={row.label}>
-          <div className="comparison-cell comparison-label" role="rowheader">{row.label}</div>
-          {row.values.map((value, index) => <div className="comparison-cell" role="cell" key={`${row.label}-${index}`}>{value}</div>)}
-        </div>
-      ))}
-    </div>
+    <section className="comparison-view" aria-label="参数对比">
+      <table className="comparison-table">
+        <thead>
+          <tr>
+            <th scope="col" />
+            {cards.map((card) => (
+              <th key={card.product_id} scope="col">
+                {card.title}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {specs.map((spec) => (
+            <tr key={spec}>
+              <th scope="row">{labels[spec] ?? spec}</th>
+              {cards.map((card) => (
+                <td key={`${card.product_id}-${spec}`}>
+                  {spec === "price_major" ? formatPrice(card) : String(card[spec as keyof ProductCard] ?? "-")}
+                </td>
+              ))}
+            </tr>
+          ))}
+          <tr>
+            <th scope="row">库存概览</th>
+            {cards.map((card) => (
+              <td key={`${card.product_id}-stock`}>{stockSummary(card)}</td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+    </section>
   );
 }
 
 export default function ResearchPanel({ events, activeTab, onTabChange }: ResearchPanelProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const cards = useMemo(() => latestCards(events), [events]);
+  
+  // 只获取当前 turn 的最新 product_search_tool hits，并限制为 Top 3
+  const allCards = useMemo(() => getLatestProductHitsForCurrentTurn(events), [events]);
+  const cards = useMemo(() => allCards.slice(0, 3), [allCards]);
+  
   const finalText = useMemo(() => latestFinalText(events), [events]);
   const searching = isProductSearchActive(events);
   const lowestPrice = cards.length > 1 ? Math.min(...cards.map((card) => card.price_major)) : null;
@@ -160,7 +179,7 @@ export default function ResearchPanel({ events, activeTab, onTabChange }: Resear
         {activeTab === "candidates" && (
           cards.length > 0 ? (
             <>
-              <p className="research-subtitle">买对为你找到的相关候选</p>
+              <p className="research-subtitle">优先比较这 {cards.length} 款</p>
               <div className="candidate-list">
                 {cards.map((card) => (
                   <CandidateCard
