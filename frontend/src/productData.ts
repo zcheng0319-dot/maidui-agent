@@ -3,25 +3,52 @@ import type { ProductCard, TradeEvent } from "./types";
 /**
  * 获取当前 turn 中最新一次 product_search_tool 的 hits。
  * 
- * Current turn 定义：从上一条 final.result 之后到当前。
- * 如果没有 final.result，则从 session 开始算起。
+ * Current turn 定义：
+ * - 如果当前 turn 已完成：从倒数第二个 final.result 到最后一个 final.result 之间
+ * - 如果当前 turn 仍在进行：从最后一个 final.result 之后到当前
+ * - 如果没有 final.result：从 session 开始到当前
  */
 export function getLatestProductHitsForCurrentTurn(events: TradeEvent[]): ProductCard[] {
-  // 找到最后一条 final.result 的位置
-  let start = 0;
-  for (let index = events.length - 1; index >= 0; index -= 1) {
+  // 收集所有 final.result 的索引
+  const finalResultIndices: number[] = [];
+  for (let index = 0; index < events.length; index += 1) {
     if (events[index].type === "final.result") {
-      start = index + 1;
-      break;
+      finalResultIndices.push(index);
     }
   }
   
-  // 只搜索当前 turn 的 events
-  const currentTurnEvents = events.slice(start);
+  let start: number;
+  let end: number;
   
-  // 从后往前找最新一次 product_search_tool 的 tool.result
-  for (let index = currentTurnEvents.length - 1; index >= 0; index -= 1) {
-    const event = currentTurnEvents[index];
+  if (finalResultIndices.length === 0) {
+    // 没有 final.result：从 session 开始到当前
+    start = 0;
+    end = events.length;
+  } else {
+    const lastFinalIndex = finalResultIndices[finalResultIndices.length - 1];
+    
+    // 检查最后一个 event 是否是 final.result（判断当前 turn 是否已完成）
+    const lastEventIsFinal = events.length > 0 && events[events.length - 1].type === "final.result";
+    
+    if (lastEventIsFinal || finalResultIndices.length >= 2) {
+      // CASE B: 当前 turn 已完成，或有至少两个 final.result
+      // 查找范围：倒数第二个 final.result 之后 到 最后一个 final.result
+      const secondLastFinalIndex = finalResultIndices.length >= 2 
+        ? finalResultIndices[finalResultIndices.length - 2] 
+        : 0;
+      start = secondLastFinalIndex + 1;
+      end = lastFinalIndex + 1; // 包含最后一个 final.result
+    } else {
+      // CASE A: 当前 turn 仍在进行中
+      // 查找范围：最后一个 final.result 之后 到 当前
+      start = lastFinalIndex + 1;
+      end = events.length;
+    }
+  }
+  
+  // 在 [start, end) 范围内从后往前找最新一次 product_search_tool 的 tool.result
+  for (let index = end - 1; index >= start; index -= 1) {
+    const event = events[index];
     if (event.type !== "tool.result") continue;
     
     const toolName = String(event.payload?.tool ?? "").toLowerCase();
