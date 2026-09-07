@@ -18,7 +18,11 @@ export interface KnownSpecs {
 
 export function extractKnownSpecs(card: ProductCard): KnownSpecs {
   const highlights = card.highlights ?? [];
-  const weight = highlights.find((value) => /(?:\d+(?:\.\d+)?\s?(?:g|kg|克|公斤)|重量|weight)/i.test(value));
+  const weight = highlights.find((value) => {
+    if (/承重|负重|载重|max\s*load/i.test(value)) return false;
+    return /(?:重量|自重|单支|超轻|weight)/i.test(value)
+      && /\d+(?:\.\d+)?\s?(?:g|kg|克|公斤)/i.test(value);
+  });
   const material = highlights.find((value) => /碳纤维|铝合金|钛合金|塑料|不锈钢/i.test(value));
   const foldedLength = highlights.find((value) => /折叠|收纳长度/i.test(value))
     ?.match(/\d+(?:\.\d+)?\s?cm/i)?.[0];
