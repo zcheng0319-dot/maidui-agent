@@ -9,7 +9,7 @@
  *
  * 数据约束（重要）：
  *   - 本组件纯布局，不触犯 WebSocket / events / turns / submit 数据流
- *   - 聊天真实逻辑、AgentPanel、ProductCards 全部由 App 通过 `left` / `right` 传入
+ *   - 对话与商品研究内容均由 App 通过 `left` / `right` 传入
  *   - 不引入 react-resizable-panels 等任何新 dependency
  *   - 不在 SessionView 内复刻任何 mock / fake product / fake Match
  *
