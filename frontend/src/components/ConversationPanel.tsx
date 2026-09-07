@@ -1,7 +1,9 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef } from "react";
 import { getEventsForActiveAgentTurn, getEventsForAgentTurn } from "../agentSteps";
+import { latestCards } from "../productData";
 import { AgentMessage, UserMessage } from "./Message";
 import type { TradeEvent } from "../types";
+import type { ResearchTab } from "./ResearchPanel";
 
 export interface ConversationTurn {
   role: "buyer" | "agent";
@@ -17,7 +19,7 @@ interface ConversationPanelProps {
   input: string;
   onInputChange: (value: string) => void;
   onSubmit: (value?: string) => void;
-  productCards: ReactNode;
+  onOpenTab: (tab: ResearchTab) => void;
 }
 
 const QUICK_PROMPTS = ["更轻", "更便宜", "更耐用", "只看 500 元内"];
@@ -30,7 +32,7 @@ export default function ConversationPanel({
   input,
   onInputChange,
   onSubmit,
-  productCards,
+  onOpenTab,
 }: ConversationPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const activeEvents = getEventsForActiveAgentTurn(events);
@@ -53,7 +55,13 @@ export default function ConversationPanel({
             const turnEvents = turn.finalEventIndex === undefined
               ? []
               : getEventsForAgentTurn(events, turn.finalEventIndex);
-            return <AgentMessage key={index} text={turn.text} events={turnEvents} />;
+            const turnCards = latestCards(turnEvents);
+            const actions = [
+              ...(turnCards.length > 0 ? [{ label: "查看候选商品", onClick: () => onOpenTab("candidates") }] : []),
+              ...(turnCards.length >= 2 ? [{ label: "查看完整对比", onClick: () => onOpenTab("comparison") }] : []),
+              ...(turn.finalEventIndex !== undefined ? [{ label: "查看详细分析", onClick: () => onOpenTab("recommendation") }] : []),
+            ];
+            return <AgentMessage key={index} text={turn.text} events={turnEvents} actions={actions} />;
           })}
 
           {showLiveAgent && (
@@ -64,8 +72,6 @@ export default function ConversationPanel({
               active={liveReplyActive}
             />
           )}
-
-          {productCards}
         </div>
       </div>
 

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import AgentPanel from "./components/AgentPanel";
 import ConversationPanel, { type ConversationTurn } from "./components/ConversationPanel";
-import ProductCards from "./components/ProductCards";
+import ResearchPanel, { type ResearchTab } from "./components/ResearchPanel";
 import HomeView from "./components/HomeView";
 import HistorySidebar from "./components/HistorySidebar";
 import SessionView from "./components/SessionView";
@@ -38,6 +37,7 @@ export default function App() {
   const [connecting, setConnecting] = useState(true);
   const [view, setView] = useState<"home" | "session">("home");
   const [homeKey, setHomeKey] = useState(0);
+  const [researchTab, setResearchTab] = useState<ResearchTab>("candidates");
   const wsRef = useRef<WebSocket | null>(null);
   // This ref preserves the existing event stream and supplies a UI-only turn boundary.
   const eventsRef = useRef<TradeEvent[]>([]);
@@ -155,15 +155,12 @@ export default function App() {
       input={input}
       onInputChange={setInput}
       onSubmit={(value) => void submit(value)}
-      productCards={<ProductCards events={events} />}
+      onOpenTab={setResearchTab}
     />
   );
 
   const rightContent = (
-    <div className="session-right-wrap">
-      <AgentPanel events={events} />
-      <p className="session-right-hint">商品研究区将在后续阶段接入真实候选数据。</p>
-    </div>
+    <ResearchPanel events={events} activeTab={researchTab} onTabChange={setResearchTab} />
   );
 
   return (

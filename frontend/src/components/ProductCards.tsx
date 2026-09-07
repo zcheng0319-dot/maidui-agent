@@ -1,17 +1,8 @@
 import { useState } from "react";
 import type { ProductCard, TradeEvent } from "../types";
+import { latestCards } from "../productData";
 
 /** 从最近一次 product_search 相关的工具事件里取商品卡（工具结果 JSON 由 Agent 侧透传）。 */
-function latestCards(events: TradeEvent[]): ProductCard[] {
-  for (let i = events.length - 1; i >= 0; i -= 1) {
-    const event = events[i];
-    if (event.type !== "tool.result") continue;
-    const cards = event.payload?.hits as ProductCard[] | undefined;
-    if (cards && cards.length) return cards;
-  }
-  return [];
-}
-
 /** 提取首字作为卡片装饰首字母 */
 function letterOf(card: ProductCard): string {
   const t = (card.title ?? card.brand ?? "?").trim();
