@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/components/eventtimeline.tsx","./src/components/productcards.tsx","./vite.config.ts"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/maiduimock.tsx","./src/agentsteps.ts","./src/main.tsx","./src/types.ts","./src/components/agentpanel.tsx","./src/components/productcards.tsx","./src/components/welcomestate.tsx","./vite.config.ts"],"version":"5.9.3"}

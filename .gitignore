@@ -8,3 +8,5 @@ eval/report-*.md
 # 召回评测报告同样是每次跑测的产物，不入库；标注集（eval/*.jsonl）要入库
 eval/recall-report-*.md
 eval/category-recall-report-*.md
+# WorkBuddy 助手记忆与审计中间产物，不入库
+.workbuddy/
