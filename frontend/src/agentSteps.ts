@@ -194,7 +194,8 @@ export function getEventsForAgentTurn(
 
   let start = 0;
   for (let index = finalEventIndex - 1; index >= 0; index -= 1) {
-    if (events[index].type === "final.result") {
+    if (events[index].type === "request.started") { start = index; break; }
+    if (events[index].type === "final.result" || events[index].type === "error") {
       start = index + 1;
       break;
     }
@@ -206,7 +207,8 @@ export function getEventsForAgentTurn(
 export function getEventsForActiveAgentTurn(events: TradeEvent[]): TradeEvent[] {
   let start = 0;
   for (let index = events.length - 1; index >= 0; index -= 1) {
-    if (events[index].type === "final.result") {
+    if (events[index].type === "request.started") { start = index; break; }
+    if (events[index].type === "final.result" || events[index].type === "error") {
       start = index + 1;
       break;
     }
