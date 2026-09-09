@@ -1,77 +1,43 @@
-import { useMemo, useState } from "react";
-import { deriveSteps } from "../agentSteps";
+﻿import { useEffect, useMemo, useState } from "react";
+import { deriveWorkProgress, formatElapsed } from "../workProgress";
 import type { TradeEvent } from "../types";
 
-interface WorkTraceProps {
-  events: TradeEvent[];
-  active?: boolean;
-}
-
-function durationFor(events: TradeEvent[]): number | null {
-  const reported = events
-    .filter((event) => event.type === "tool.result")
-    .map((event) => Number(event.payload?.elapsed_ms))
-    .filter((value) => Number.isFinite(value) && value >= 0);
-
-  // Tool results are the backend's explicit duration values.  When several
-  // sequential tools report a duration, their total is the only duration we
-  // display rather than inventing a wall-clock estimate.
-  if (reported.length > 0) return reported.reduce((sum, value) => sum + value, 0);
-
-  const timestamps = events
-    .map((event) => Date.parse(event.occurred_at))
-    .filter((value) => Number.isFinite(value));
-  if (timestamps.length < 2) return null;
-
-  const elapsed = Math.max(...timestamps) - Math.min(...timestamps);
-  return elapsed >= 0 ? elapsed : null;
-}
-
-function durationLabel(milliseconds: number): string {
-  if (milliseconds < 1000) return "用时 <1 秒";
-  return `工作了 ${(milliseconds / 1000).toFixed(milliseconds < 10000 ? 1 : 0)} 秒`;
-}
-
-export default function WorkTrace({ events, active = false }: WorkTraceProps) {
-  const [expanded, setExpanded] = useState(false);
-  const { steps } = useMemo(() => deriveSteps(events), [events]);
-  const visibleSteps = steps.filter((step) => step.log.length > 0);
-  const duration = useMemo(() => durationFor(events), [events]);
-
-  if (visibleSteps.length === 0 && !active) return null;
-
+export default function WorkTrace({ events, active = false }: { events: TradeEvent[]; active?: boolean }) {
+  const [expanded, setExpanded] = useState(active);
+  const [now, setNow] = useState(Date.now);
+  const { items, summary, ended } = useMemo(() => deriveWorkProgress(events, active), [events, active]);
+  const working = active && !ended;
+  useEffect(() => {
+    if (!working) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 500);
+    return () => window.clearInterval(timer);
+  }, [working]);
+  if (!items.length && !active) return null;
+  const start = items.find(item => Number.isFinite(item.time))?.time;
+  const finish = [...items].reverse().find(item => Number.isFinite(item.time))?.time;
+  const elapsed = start === undefined ? null : (working ? now : finish ?? start) - start;
   return (
-    <section className={`work-trace${active ? " is-active" : ""}`} aria-label="工作过程">
-      <button
-        type="button"
-        className="work-trace-toggle"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((value) => !value)}
-      >
+    <section className={`work-trace${working ? " is-active" : ""}`} aria-label="工作过程">
+      <button type="button" className="work-trace-toggle" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>
         <span className="work-trace-summary">
-          {active && <span className="work-trace-working-dot" aria-hidden="true" />}
-          {active ? "买对正在分析" : duration === null ? "查看工作过程" : durationLabel(duration)}
+          {working && <span className="work-trace-working-dot" aria-hidden="true" />}{summary}
         </span>
-        <span aria-hidden="true">{expanded ? "收起" : "展开"}⌄</span>
+        <span className="work-trace-meta">{elapsed !== null && formatElapsed(elapsed)} · {expanded ? "收起" : "展开"}</span>
       </button>
-
-      {expanded && (
-        <ol className="work-trace-list">
-          {visibleSteps.map((step) => (
-            <li key={step.key} className={`work-trace-step is-${step.state}`}>
-              <span className="work-trace-step-icon" aria-hidden="true" />
-              <span>{step.label}</span>
-              {step.state === "running" && <small>进行中</small>}
-            </li>
-          ))}
-          {visibleSteps.length === 0 && active && (
-            <li className="work-trace-step is-running">
-              <span className="work-trace-step-icon" aria-hidden="true" />
-              <span>正在等待工作事件</span>
-            </li>
-          )}
-        </ol>
-      )}
+      {expanded && <ol className="work-trace-list">
+        {items.map(item => <li key={`${item.id}-${item.tool ?? item.label}`} className={`work-trace-step is-${item.state}`}>
+          <span className="work-trace-step-icon" aria-hidden="true" />
+          <div className="work-trace-content">
+            <div className="work-trace-title"><span>{item.label}</span><small>
+              {item.state === "running" ? "进行中" : item.state === "error" ? "失败" : item.state === "stopped" ? "已结束" : "已完成"}
+              {item.duration !== undefined ? ` · ${formatElapsed(item.duration)}` : ""}
+            </small></div>
+            {item.detail && <p>{item.detail}</p>}
+          </div>
+          <time className="work-trace-offset">{start !== undefined && Number.isFinite(item.time) ? `+${formatElapsed(item.time - start)}` : ""}</time>
+        </li>)}
+        {!items.length && working && <li>正在等待工作事件…</li>}
+      </ol>}
     </section>
   );
 }
