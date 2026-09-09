@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 export type TradeEventType =
+  | "request.started"
   | "agent.dispatch"
   | "tool.invoke"
   | "tool.result"
