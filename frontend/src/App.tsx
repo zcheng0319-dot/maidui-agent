@@ -42,6 +42,13 @@ export default function App() {
   const wsRef = useRef<WebSocket | null>(null);
   // This ref preserves the existing event stream and supplies a UI-only turn boundary.
   const eventsRef = useRef<TradeEvent[]>([]);
+  const requestStartRef = useRef(0);
+  const appendEvent = (event: TradeEvent) => {
+    const nextEvents = [...eventsRef.current, event];
+    eventsRef.current = nextEvents;
+    setEvents(nextEvents);
+    return nextEvents;
+  };
 
   useEffect(() => {
     let closed = false;
@@ -69,19 +76,23 @@ export default function App() {
       ws.onerror = () => setConnected(false);
       ws.onmessage = (message) => {
         const event: TradeEvent = JSON.parse(message.data);
+        if (["final.result", "error", "token.delta"].includes(event.type)
+          && eventsRef.current.slice(requestStartRef.current).some(item => item.type === "final.result" || item.type === "error")) return;
         if (event.type === "token.delta") {
           setStreaming((previous) => previous + (event.payload.token ?? ""));
+          if (!eventsRef.current.slice(requestStartRef.current).some(item => item.type === "token.delta"))
+            appendEvent({ ...event, payload: {} });
           return;
         }
 
         const nextEvents = [...eventsRef.current, event];
         eventsRef.current = nextEvents;
         setEvents(nextEvents);
-        if (event.type === "final.result") {
+        if (event.type === "final.result" || event.type === "error") {
           setStreaming("");
           setTurns((previous) => [
             ...previous,
-            { role: "agent", text: event.payload.text ?? "", finalEventIndex: nextEvents.length - 1 },
+            { role: "agent", text: event.payload.text ?? event.payload.message ?? "处理失败，请重试", finalEventIndex: nextEvents.length - 1 },
           ]);
         }
       };
@@ -100,9 +111,12 @@ export default function App() {
     if (!query || busy) return;
     setInput("");
     setBusy(true);
+    setStreaming("");
+    requestStartRef.current = eventsRef.current.length;
+    appendEvent({ type: "request.started", payload: {}, occurred_at: new Date().toISOString() });
     setTurns((previous) => [...previous, { role: "buyer", text: query }]);
     try {
-      await fetch(`${API_BASE}/commerce/intents`, {
+      const response = await fetch(`${API_BASE}/commerce/intents`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -113,8 +127,21 @@ export default function App() {
           raw_query: query,
         }),
       });
+      if (!response.ok) throw new Error(`服务返回 ${response.status}`);
+      const result = await response.json();
+      // HTTP provides the final reply if the event connection was interrupted.
+      if (!eventsRef.current.slice(requestStartRef.current).some(event => event.type === "final.result" || event.type === "error")) {
+        const next = appendEvent({ type: "final.result", payload: { text: result.final_text ?? "" }, occurred_at: new Date().toISOString() });
+        setStreaming("");
+        setTurns(previous => [...previous, { role: "agent", text: result.final_text ?? "", finalEventIndex: next.length - 1 }]);
+      }
     } catch (error) {
-      setTurns((previous) => [...previous, { role: "agent", text: `[error] 请求失败：${error}` }]);
+      if (!eventsRef.current.slice(requestStartRef.current).some(event => event.type === "final.result" || event.type === "error")) {
+        const text = `请求失败：${error}`;
+        const next = appendEvent({ type: "error", payload: { message: text }, occurred_at: new Date().toISOString() });
+        setStreaming("");
+        setTurns(previous => [...previous, { role: "agent", text, finalEventIndex: next.length - 1 }]);
+      }
     } finally {
       setBusy(false);
     }
