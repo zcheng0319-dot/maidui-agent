@@ -37,7 +37,8 @@ export default function ConversationPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const activeEvents = getEventsForActiveAgentTurn(events);
   // No final.result means this real event slice still belongs to the live reply.
-  const liveReplyActive = busy || activeEvents.length > 0;
+  const liveReplyActive = busy && !activeEvents.some(event => event.type === "error")
+    && turns[turns.length - 1]?.role === "buyer";
   const showLiveAgent = Boolean(streaming) || liveReplyActive;
 
   useEffect(() => {
