@@ -1,133 +1,184 @@
-# 买对| 电商购物助手Agent（AgentScope 2.0）
+﻿# 买对｜企业采购与品牌导购 Agent
 
-基于 AgentScope 2.0 的中国大陆电商购C端购物 Agent 系统，DDD 洋葱架构落地：
+**从一句需求，到一份可确认、可执行的购买方案。**
 
-- **MainAgent**（CommerceConcierge）：超级框总调度，**持有全部业务工具可直接单干**；
-  内置 Task 计划四件套管理任务清单；满足"可并行 / 上下文隔离 / 链深"任一条件时经 `task_dispatch` 派发子 Agent；
-  发现稳定偏好时经 `remember_preference_tool` 写入长期记忆
-- **SearchAgent**（CatalogSearchAgent）：商品检索专家，query 改写 → **embedding+rerank 二阶段召回**（Qdrant），
-    失败逐级降级（embedding_only → keyword_2gram）；可选 web_search 兜底跨境政策/关税问答
-- **TradeAgent**（OrderTradeAgent）：下单交易专家（订单创建 / 查询 / 取消，买家身份由 ShoppingContext 注入）
+买对面向企业采购团队与品牌商家，将需求沟通、商品筛选和订单操作串联到同一段对话中。企业采购人员可以围绕预算和用途寻找采购方案，品牌客服可以结合商品知识与订单信息承接客户的购买需求。
 
-分期设计脉络、关键取舍与踩坑记录见 [docs/设计演进记录.md](docs/设计演进记录.md)。
+产品希望为企业减少人工查找、重复录入和跨系统操作，让员工把时间花在方案判断、客户沟通与异常处理上。
 
-## 技术栈
+> **当前阶段：可本地运行的产品原型。** 已实现基于演示商品目录的检索推荐、品类知识问答、偏好记忆，以及系统内订单创建、查询和取消。下文的企业采购与品牌服务流程是目标落地场景；供应商平台、ERP、审批、客户地址库、支付链接及退货退款接口尚待接入。当前提示词与演示界面仍以个人选购为基础，企业角色和业务规则需要进一步适配。
 
-- Python 3.11 + uv
-- AgentScope 2.x（Agent + ContextConfig 上下文压缩 + Toolkit/FunctionTool + 内置 Task 计划工具
-  + reply_stream 类型化事件流 + TracingMiddleware / ReplyBudgetControlMiddleware / 自定义工具中间件）
-- 检索：OpenAI 兼容 embedding（text-embedding-v4）+ Qdrant（服务端/本地嵌入双形态）+ HTTP Reranker（可降级）
-- 知识库：AgentScope `rag.KnowledgeBase`（品类洞察 Markdown → 切片 → Qdrant）
-- FastAPI + Uvicorn + WebSocket；React 18 + Vite + TS 前端；Docker Compose（app + worker + qdrant + redis + frontend）
-- 持久化：SQLite（SQLAlchemy 2.0 async）存对话流水/事件轨迹/会话状态/订单/偏好；商品目录仍为内存仓储 + 种子数据
-- 缓存与削峰：Redis（可选）——语义缓存 + embedding 缓存 + 幂等键 + Stream 任务队列 + 跨进程事件背板
+## 谁会使用，谁会受益
 
-## 架构
+| 目标客户 | 直接使用者 | 核心任务 | 希望获得的业务价值 |
+| --- | --- | --- | --- |
+| 有内部采购需求的企业 | 行政专员、采购人员；审批环节涉及部门负责人 | 按用途、数量、预算和供应商要求选品，再提交采购申请 | 缩短采购准备时间，减少填单错误，提高预算与采购规则的遵循程度 |
+| 有咨询导购需求的品牌商家 | 品牌客服；接入客户渠道后也可直接服务消费者 | 回答商品问题、推荐商品、协助下单并衔接订单服务 | 减少客服切换后台的操作，提高接待效率与购买衔接效率 |
 
-```text
-app/
-├── domain/            # 领域层：Product/Sku/Money、Order 状态机、汇率表、关税运费规则、偏好、会话/队列/仓储端口
-├── application/
-│   ├── usecases/      # CatalogSearch（二阶段召回+到手价内联）、PlaceOrder/QueryOrder/CancelOrder
-│   ├── tools/         # product_search、订单三工具、web_search、remember_preference、task_dispatch
-│   ├── agents/        # MainAgent / SearchAgent / TradeAgent 工厂 + Orchestrator + SessionRegistry
-│   └── prompts/       # maidui.yml：主 / 子 Agent 系统提示词
-├── infrastructure/    # llm/embedding/qdrant/reranker/tracing、rag 知识库、缓存、队列、韧性与闸门、仓储
-├── presentation/      # FastAPI 路由、WebSocket ConnectionManager、DTO
-├── composition.py     # 装配容器（API 与 worker 共用一份接线）
-└── worker.py          # 意图消费进程入口
-knowledge/             # 品类洞察知识文档（Markdown，服务启动时幂等入库）
-frontend/              # React + Vite 前端：对话流 + 商品卡 + 事件时间线
-eval/                  # 评测用例集 cases.yaml + 回归报告
-docs/                  # 设计演进记录（分期取舍与踩坑档案）
-docker/                # docker-compose.yaml（app + worker + qdrant + redis + frontend）
-```
+两类场景共享的核心能力是：**理解需求 → 找到有依据的候选 → 确认方案 → 调用业务系统执行。** 各场景的商品来源、权限、确认规则和执行接口按企业流程适配。
 
-关键设计：
+## 场景一：公司行政与采购
 
-- **网关配额治理**：`GatewayThrottle` 同时限并发（`LLM_MAX_CONCURRENCY`，默认 2）与请求起点间隔
-  （`LLM_MIN_INTERVAL_SECONDS`）；流式请求的名额持有到流耗尽才释放；瞬时故障指数退避重试，
-  用尽后回退 `LLM_FALLBACK_MODEL` 并发 `model.fallback` 事件（不静默降级）
-- **语义缓存**：相似问句（余弦 ≥ `SEMANTIC_CACHE_THRESHOLD`，默认 0.95）直接复用历史回复，
-  命中即零模型调用并发 `cache.hit` 事件；**写操作意图（下单/取消）与上下文依赖问句不入缓存**，
-  按 buyer 分桶避免跨买家复用
-- **存储可替换**：`SessionStore` / `ConversationStore` / `OrderRepository` / `PreferenceStore` 四个端口，
-  SQLite（默认）/ JSON 文件两套实现共存，换存储只改 `app/composition.py`
-- **异步削峰**：`TaskQueue` 端口 + Redis Stream 实现（消费者组 / ack / pending 重投 / 死信），
-  独立 worker 进程消费；`POST /commerce/intents` **同步语义不变**（内部入队+等结果），
-  另提供 `/commerce/intents/async` + `/commerce/tasks/{id}`；队列是 at-least-once，靠幂等键防重复下单
-- **跨进程事件**：worker 与 API 是两个进程，事件总线接 Redis Pub/Sub 背板后前端仍能收到流式事件；
-  广播带 `origin` 标识以跳过自己发的消息（否则事件会回环投递两次）
-- **主 Agent 单干优先**：MainAgent 与子 Agent 持有同一批业务工具（`build_tools()` 复用），
-  只在"可并行 / 上下文隔离 / 调用链深"时派发
-- **二阶段召回**：embed → Qdrant 向量召回 topN → rerank 精排 topK；降级链
-  embedding_rerank → embedding_only → keyword_2gram，`recall_strategy` 如实标注；
-  价格等硬约束走工具参数结构化过滤（price_max_major），不交给模型
-- **过滤可观测**：被 ship_to / 价格上限挡掉的候选以 `filtered_out`（含 reason）回传，
-  让模型能区分"库里没有"与"有但不满足约束"，避免把超预算商品答成"没有这个商品"
-- **品类洞察 RAG**：`category_insight_tool` 查 `rag.KnowledgeBase`（选购口径、价格区间、避坑点、
-  跨境通则），先给判断标准再给商品清单
-- **上下文工程**：ContextConfig 定制压缩（trigger_ratio 0.75 / reserve_ratio 0.15 + 工具结果截断），
-  摘要落 AgentState.summary 并推送 `context.compressed` 事件；配合 Token 预算中间件收口单轮开销
-- **工具韧性**：ToolResilienceMiddleware 分级超时 + 按工具熔断（closed→open→half_open），
-  触发时返回 [error] 让模型如实告知，不编造数字
-- **真并行**：同一轮内多个 `task_dispatch` 由 2.0 并发批执行（`is_concurrency_safe`），
-  `scripts/verify_parallel.py` 用事件时间戳比对并行/串行墙钟耗时
-- **到手价内联**：传 ship_to 时商品卡自动内联 landed_price（小计+运费+关税，汇率统一折算），
-  比价/运费不单独暴露工具，减少不必要的工具调用轮次
-- **长期记忆**：写路径 remember_preference_tool → JSON 文件 Store；读路径 orchestrator
-  在偏好变化时注入 `<buyer-preferences>` hint，跨会话、跨重启生效
-- **会话持久化**：AgentState 每轮落盘 DATA_DIR/sessions/，服务重启后恢复多轮对话
-- **SubAgent as Tool**：2.0 库级无 subagent 原语（官方 Agent Team 在 agentscope.app 平台层），
-  用 FunctionTool 包装 `task_dispatch(subagent_type, demands)` 实现同等语义
-- **事件流**：reply_stream → token.delta / plan.update；工具自身发布 tool.invoke/tool.result；
-  TradeEventBus 按会话路由 WebSocket
-- **可观测**：全部 Agent 挂 TracingMiddleware，OTEL_EXPORTER_OTLP_ENDPOINT 配置后导出 OTLP Trace
+### 一句话发起一项采购任务
 
-## 启动
+> 「给新来的 10 个程序员，每人配一套显示器和键盘，每套预算 2000 元，要京东自营，明天能到。」
 
-```bash
+传统流程中，行政人员需要自行拆解需求、搜索比价、确认供货情况，再把商品、数量、地址和发票信息录入采购系统，提交审批。商品选择与采购申请分散在不同页面，信息需要反复搬运。
+
+### 目标工作流程
+
+1. **理解采购需求。** MainAgent 整理人数、每套组成、单套预算、供应商限制和到货要求，补齐执行所需信息。
+2. **寻找可采购方案。** SearchAgent 从企业合作供应商目录中检索商品，依据实时价格、库存和履约数据筛选显示器与键盘组合。
+3. **呈现方案与取舍。** MainAgent 汇总候选组合、单套金额、采购总额及条件满足情况，交给采购人员选择。
+4. **生成采购申请。** 用户确认方案后，TradeAgent 调用 ERP，按企业授权读取收货地址、发票抬头等信息并创建申请单。
+5. **审批后执行。** 申请进入企业既有审批流程，审批通过后由对接系统下单，并回传处理状态。
+
+**业务价值假设：** 减少搜商品和填单的人工时间，将预算、供应商及审批要求纳入购买流程，减少超预算和不符合采购规则的操作。
+
+**落地重点：** 单套预算需要校验组合金额，采购总额需要结合数量核算；「京东自营」「明天到货」必须有供应商和履约数据支撑。用户选中方案不等于企业审批通过，采购申请与正式订单需要区分状态。
+
+## 场景二：品牌客服与导购
+
+### 在一次沟通中衔接咨询、购买和订单服务
+
+> 「想了解一下新款粉底液的成分和适用说明，合适的话买一瓶。另外，上次买的口红可以退吗？」
+
+传统流程中，客服需要查产品手册、核对客户订单、切换后台创建订单或提交售后申请，再回到聊天窗口解释进度。
+
+### 目标工作流程
+
+1. **回答有依据的商品问题。** SearchAgent 检索品牌商品资料和知识库，提供成分、规格与使用说明，并解释候选差异。
+2. **承接购买意图。** MainAgent 确认客户选择的商品、规格和数量，把咨询自然衔接到购买确认。
+3. **协助创建订单。** 在身份核验与授权后，TradeAgent 读取客户已保存的地址，核对订单信息，再通过品牌系统生成订单或支付链接。
+4. **衔接售后申请。** 根据历史订单和品牌售后规则核实可申请的服务，经客户确认后提交退货申请，返回受理状态；实际退款结果由售后系统处理。
+5. **需要时转交人工。** 信息不足、授权缺失或售后存在争议时，保留沟通上下文并交给客服处理。
+
+**业务价值假设：** 减少客服查资料、切后台和重复录入的时间，降低客户从咨询到购买的操作负担，让客服能够处理更多有效会话。
+
+**落地重点：** 商品描述应依据品牌资料；不能从「不含某成分」直接推断某位客户使用一定安全。创建订单、退货申请和退款完成是不同业务状态，需要分别反馈。接待效率与转化提升幅度仍待真实试点验证。
+
+## 当前原型验证了什么
+
+当前实现提供两个场景可复用的基础能力，企业完整流程仍需业务系统集成。
+
+| 能力 | 当前实现 | 场景落地时需补齐 |
+| --- | --- | --- |
+| 自然语言选购 | 从对话中提取用途、品类、预算和偏好，检索内置商品目录 | 企业采购字段、组合预算、供应商准入与交期校验 |
+| 商品知识与推荐 | 品类知识库提供选购依据，商品工具提供价格、库存与规格 | 企业供应商目录、品牌商品资料和实时商品数据 |
+| 方案呈现 | 对话、商品候选、推荐说明与工作进度 | 批量采购方案、申请单预览和企业专属业务状态 |
+| 持续沟通 | 多轮上下文、长期偏好记忆与偏好撤回 | 企业、员工与终端客户的身份及数据权限体系 |
+| 订单操作 | 系统内订单创建、查询与取消；提示词要求写操作先确认 | ERP 申请单、审批、真实下单、支付链接和售后接口 |
+| 过程记录与运行保障 | 事件轨迹、持久化、超时处理和运行时护栏 | 企业审计要求、业务状态对账与人工接管流程 |
+
+现有「取消订单」能力不等同于退货退款，买家偏好也不能替代企业采购政策。当前离线评测用于检查基础行为，不代表上述企业场景已端到端验收。
+
+## Agent 如何分工
+
+| 角色 | 产品职责 |
+| --- | --- |
+| **MainAgent：需求与流程协调** | 理解诉求、维护上下文、汇总方案、发起确认，并协调后续操作 |
+| **SearchAgent：商品与知识检索** | 根据需求寻找候选，结合知识解释筛选依据，返回有数据支撑的商品信息 |
+| **TradeAgent：订单执行** | 在确认后执行订单创建、查询和取消；后续通过适配接口衔接企业业务系统 |
+
+简单搜索或订单查询可由 MainAgent 直接处理；多品类检索等复杂任务再按需派发，以平衡响应速度和模型调用成本。
+
+## 关键产品决策
+
+| 决策 | 产品考虑 |
+| --- | --- |
+| 先验证通用选购与订单流程，再接入企业系统 | 用可检查的演示数据验证交互和执行链路，再适配不同企业的商品来源与流程 |
+| 商品知识与交易事实分开使用 | 知识库解释「怎么选」，业务工具提供价格、库存和订单状态，减少事实混用 |
+| 硬约束由程序校验 | 当前对预算等条件做结构化过滤；企业场景需进一步加入组合金额、供应商和审批规则 |
+| 执行前明确确认，企业审批单独处理 | 让用户能够核对即将发生的操作，并在企业落地时保留组织授权边界 |
+| 长期偏好与当次需求分开 | 减少重复沟通，也避免上一次任务的预算和偏好干扰本次采购 |
+| 缺数据或执行失败时明确反馈 | 帮助用户调整条件或转交人工，避免误报商品、履约承诺和订单结果 |
+
+当前行为约定见 [Agent 提示词](app/application/prompts/maidui.yml)。提示词中的规则仍需结合程序校验和场景评测验证其实际遵循程度。
+
+## 如何衡量业务价值
+
+以下是拟用于试点的验证口径，尚无真实客户效率提升或转化增长数据。试点应在同类任务、相近复杂度下比较人工流程与 Agent 辅助流程。
+
+| 场景 | 核心指标 | 配套检查 |
+| --- | --- | --- |
+| 企业采购 | 从需求提出到采购申请可提交的平均人工处理时长 | 方案约束满足率、申请单返工率、未经审批执行次数 |
+| 品牌客服 | 单次咨询与订单服务的平均人工处理时长 | 商品回答准确率、人工接管率、重复或错误操作次数 |
+| 品牌导购 | 有明确购买意图的有效会话中，规定观察期内完成购买的比例 | 区分订单创建与支付成功，并结合取消、退货情况判断效果 |
+| 共用能力 | 端到端任务完成率、响应耗时和单任务调用成本 | 商品与订单事实正确率、超时率、未经确认的写操作次数 |
+
+### 已有离线评测与发现
+
+仓库包含功能回归、商品召回与品类知识检索三类评测。以下摘自 [2026-09-07 评测报告](eval/COMPREHENSIVE_EVAL_REPORT_20260907.md)，**是历史运行结果，不代表当前版本重新验证后的表现，也不等同于线上业务效果。**
+
+| 评测方向 | 报告记录 | 对迭代的启示 |
+| --- | --- | --- |
+| 功能回归 | 40 条用例，部分超时，未形成完整通过结论 | 继续覆盖预算、记忆、模糊需求和操作边界，优先定位复杂多轮任务的耗时问题 |
+| 商品召回 | 有效执行 78 条；Recall@8 为 0.611，未达报告设定的 0.75 阈值 | 优先改善品牌、商品 ID 等精确查询，同时检查评测目标与目录覆盖是否一致 |
+| 品类知识检索 | 有效执行 42 条；Recall@5 为 0.881，NDCG@5 为 0.739，报告判定通过 | 已有知识检索基础，仍需验证知识能否转化为有用的推荐解释 |
+
+报告中的总数据量与有效执行量存在差异，检索策略配置也有需核对之处。下一轮应先统一数据集、执行环境和指标口径，再比较优化效果。
+
+## 下一步迭代
+
+以下为计划方向，尚不代表已交付能力：
+
+1. **选择一个场景开展最小试点。** 与目标企业确认高频任务、当前处理时长、数据可用性和接口权限，确定首期验收范围。
+2. **补齐业务规则与真实数据。** 采购方向优先验证供应商目录、组合预算及申请单；品牌方向优先验证商品资料、客户身份与订单查询。
+3. **接通可控的执行流程。** 根据试点选择对接 ERP 审批或品牌下单系统，增加权限校验、状态回传、异常处理和人工接管；售后作为独立流程逐步接入。
+4. **用场景评测推动迭代。** 在优化商品召回和多轮耗时的同时，新增批量采购、审批拒绝、地址确认及售后异常用例，对比人工流程验证业务价值。
+
+## 本地体验
+
+需要 Python 3.11、uv、Node.js / npm，以及可用的 OpenAI 兼容模型服务。以下命令以 Windows PowerShell 为例。
+
+在项目根目录启动后端：
+
+```powershell
 uv sync
-# 敏感配置通过环境变量注入（推荐），不落盘、不入库
-export LLM_BASE_URL=<OpenAI 兼容网关地址>
-export LLM_API_KEY=<密钥>
-export LLM_MODEL=qwen-plus   # 可选，缺省 qwen3-max（限流时自动回退 LLM_FALLBACK_MODEL，缺省 qwen-plus）
+$env:LLM_BASE_URL = "<OpenAI 兼容服务地址>"
+$env:LLM_API_KEY = "<你的密钥>"
+$env:LLM_MODEL = "<可用的模型名称>"
 uv run uvicorn app.presentation.server:app --port 8000
-
-# 启用队列削峰时（需 REDIS_URL）另起消费进程：
-uv run python -m app.worker
 ```
 
-> 本地开发也可 `cp .env.example .env` 填值兜底（已被 gitignore，勿提交真实密钥）；
-> 同名环境变量优先于 .env。
+另开一个终端启动前端：
 
-## API 概览
-
-- `POST /commerce/intents` 提交买家自然语言意图（同步返回最终回复）
-- `WS   /commerce/events` 订阅会话事件流（连上后先发 `{"shopping_session_id": "..."}`）
-- `GET  /commerce/orders/{order_id}` 查询订单
-- `POST /commerce/orders/{order_id}/cancel` 取消订单
-- `GET  /health` 健康检查
-
-## 验证
-
-```bash
-uv run pytest                          # 137 个单测：domain / 召回降级与过滤回传 / 计价规则 / 记忆持久化 / 压缩策略 / 韧性中间件
-uv run python scripts/smoke_e2e.py    # 端到端冒烟：WS 订阅 + 提交意图，实时打印事件流
-uv run python scripts/verify_parallel.py   # 并行验证：同轮多派 vs 串行的墙钟耗时与事件重叠数对比
-uv run python scripts/eval_regression.py   # 评测回归：13 条 case，LLM judge 按 P0/P1/P2 Rubric 打分出报告
+```powershell
+cd frontend
+npm install
+npm run dev
 ```
 
-评测 case 支持 `prior_context` 字段：把跨会话已成立的事实（如上一 case 写入的长期偏好）告知 judge，
-否则 judge 只看本会话记录，会把"正确应用历史偏好"误判为"无据添加"。
+打开 http://localhost:5173 体验对话流程。仅查看界面演示可访问 http://localhost:5173/mock，该页面使用模拟内容。
 
-## Docker 部署
+完整的语义检索与品类知识体验需要配置可用的 Embedding 服务；重排序和联网核验能力按配置启用。配置项见 [settings.py](app/infrastructure/settings.py)。本地模式无需单独部署 Redis 或 Qdrant；如需完整容器环境，可参考 [Docker Compose 配置](docker/docker-compose.yaml)。密钥通过环境变量或本地 `.env` 配置，请勿提交到仓库。
 
-```bash
-export LLM_BASE_URL=<网关地址> LLM_API_KEY=<密钥>   # 敏感配置走环境变量，compose 透传
-docker compose -f docker/docker-compose.yaml up -d --build   # app + qdrant + frontend
-# 前端 http://localhost:5173  后端 http://localhost:8000
+<details>
+<summary>技术实现与验证入口</summary>
+
+技术实现围绕需求理解、商品检索、偏好记忆与订单操作展开：
+
+- **Agent 编排：** AgentScope 2.x，主 Agent 按需调用检索与交易子 Agent。
+- **检索与知识：** Embedding、Qdrant、可选 Reranker，以及 Markdown 品类知识库。
+- **交互：** React + TypeScript 前端，FastAPI + WebSocket 提供对话与进度事件。
+- **状态与运行保障：** SQLite 持久化，可选 Redis 缓存与队列，配合预算控制、超时处理和运行时护栏。
+
+| 入口 | 内容 |
+| --- | --- |
+| [app/application](app/application) | Agent、提示词、工具与记忆策略 |
+| [frontend/src](frontend/src) | 首页、对话、商品候选与工作进度界面 |
+| [knowledge](knowledge) | 品类选购知识 |
+| [eval/cases.yaml](eval/cases.yaml) | 功能与行为回归用例 |
+| [eval](eval) | 商品召回、知识检索数据集及历史报告 |
+| [scripts](scripts) | 端到端冒烟、评测与性能验证脚本 |
+
+后端启动后，可在另一个终端运行：
+
+```powershell
+uv run python scripts/smoke_e2e.py
+uv run python scripts/eval_regression.py
 ```
 
-本地开发不依赖 Docker：QDRANT_URL 置空时自动用 qdrant-client 本地嵌入模式（单进程文件锁，
-多实例/生产请用 compose 的 Qdrant 服务端）。
+上述脚本会调用运行中的服务，评测需要相应模型配置并产生调用消耗。
+
+</details>
